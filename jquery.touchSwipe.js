@@ -266,6 +266,7 @@
     hold: null,
     triggerOnTouchEnd: true,
     triggerOnTouchLeave: false,
+    triggerOnTouchLeaveParent: false,
     allowPageScroll: "auto",
     fallbackToMouseEvents: true,
     excludedElements: ".noSwipe",
@@ -784,7 +785,7 @@
 
 
         //If we trigger end events when threshold are met, or trigger events when touch leaves element
-        if (!options.triggerOnTouchEnd || options.triggerOnTouchLeave) {
+        if (!options.triggerOnTouchEnd || options.triggerOnTouchLeave || options.triggerOnTouchLeaveParent) {
 
           var inBounds = true;
 
@@ -794,12 +795,17 @@
             inBounds = isInBounds(currentFinger.end, bounds);
           }
 
+          if (options.triggerOnTouchLeaveParent) {
+            var bounds = getbounds($(this).parent());
+            inBounds = isInBounds(currentFinger.end, bounds);
+          }
+
           //Trigger end handles as we swipe if thresholds met or if we have left the element if the user has asked to check these..
           if (!options.triggerOnTouchEnd && inBounds) {
             phase = getNextPhase(PHASE_MOVE);
           }
           //We end if out of bounds here, so set current phase to END, and check if its modified
-          else if (options.triggerOnTouchLeave && !inBounds) {
+          else if ((options.triggerOnTouchLeave || options.triggerOnTouchLeaveParent) && !inBounds) {
             phase = getNextPhase(PHASE_END);
           }
 
@@ -925,6 +931,17 @@
       }
     }
 
+    function touchLeaveParent(jqEvent) {
+      //If these events are being programmatically triggered, we don't have an original event object, so use the Jq one.
+      var event = jqEvent.originalEvent ? jqEvent.originalEvent : jqEvent;
+
+      //If we have the trigger on leave property set....
+      if (options.triggerOnTouchLeaveParent) {
+        phase = getNextPhase(PHASE_END);
+        triggerHandler(event, phase);
+      }
+    }
+
     /**
      * Removes all listeners that were associated with the plugin
      * @inner
@@ -938,6 +955,7 @@
       //we only have leave events on desktop, we manually calculate leave on touch as its not supported in webkit
       if (LEAVE_EV) {
         $element.unbind(LEAVE_EV, touchLeave);
+        $element.unbind(LEAVE_EV, touchLeaveParent);
       }
 
       setTouchInProgress(false);
@@ -961,11 +979,11 @@
         nextPhase = PHASE_CANCEL;
       }
       //Else if we are moving, and have reached distance then end
-      else if (validDistance && currentPhase == PHASE_MOVE && (!options.triggerOnTouchEnd || options.triggerOnTouchLeave)) {
+      else if (validDistance && currentPhase == PHASE_MOVE && (!options.triggerOnTouchEnd || options.triggerOnTouchLeave || options.triggerOnTouchLeaveParent)) {
         nextPhase = PHASE_END;
       }
       //Else if we have ended by leaving and didn't reach distance, then cancel
-      else if (!validDistance && currentPhase == PHASE_END && options.triggerOnTouchLeave) {
+      else if (!validDistance && currentPhase == PHASE_END && (options.triggerOnTouchLeave || options.triggerOnTouchLeaveParent)) {
         nextPhase = PHASE_CANCEL;
       }
 
@@ -1603,6 +1621,7 @@
         //we only have leave events on desktop, we manually calcuate leave on touch as its not supported in webkit
         if (LEAVE_EV) {
           $element.bind(LEAVE_EV, touchLeave);
+          $element.bind(LEAVE_EV, touchLeaveParent);
         }
       } else {
 
@@ -1612,6 +1631,7 @@
         //we only have leave events on desktop, we manually calcuate leave on touch as its not supported in webkit
         if (LEAVE_EV) {
           $element.unbind(LEAVE_EV, touchLeave, false);
+          $element.unbind(LEAVE_EV, touchLeaveParent, false);
         }
       }
 
